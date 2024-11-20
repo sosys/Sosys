@@ -1,23 +1,53 @@
-from typing import Union
-from fastapi import FastAPI
-from pydantic import BaseModel # Para receber body de PUT
+from fastapi import FastAPI, HTTPException
+from datetime import datetime, timedelta
+import jwt
+# from pydantic import BaseModel # Para receber body de PUT
 
+# Chave secreta para gerar o token
+SECRET_KEY = "my_secret_key"
+ALGORITHM = "HS256"
+
+# Banco de dados fictício para autenticação
+fake_db = {
+    "user1": "123",
+    "user2": "111",
+}
+
+# Inicializando a aplicação FastAPI
 app = FastAPI()
 
-class Item(BaseModel):
-    name: str
-    price: float
-    is_offer: Union[bool, None] = None
+# Função para gerar o token JWT
+def create_access_token(data: dict, expires_delta: timedelta):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+# Rota para autenticação via GET
+@app.get("/login")
+async def login(username: str, password: str):
+    # Verificação do usuário e senha
+    if username in fake_db and fake_db[username] == password:
+        access_token_expires = timedelta(minutes=1)
+        access_token = create_access_token(
+            data={"sub": username},
+            expires_delta=access_token_expires
+        )
+        return {"access_token": access_token, "token_type": "bearer"}
+    else:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
-
-@app.put("/items/{item_id}")
-def update_item(item_id: int, item: Item):
-    return {"item_name": item.name, "item_id": item_id}
-
+# Exemplo de uma rota protegida que requer autenticação
+@app.get("/protected")
+async def protected_route(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+        return {"message": f"Bem-vindo, {username}!"}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
