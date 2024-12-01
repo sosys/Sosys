@@ -1,53 +1,45 @@
-from fastapi import FastAPI, HTTPException
-from datetime import datetime, timedelta
-import jwt
-# from pydantic import BaseModel # Para receber body de PUT
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
+from auth import validate_user, create_access_token, decode_access_token
+import os
 
-# Chave secreta para gerar o token
-SECRET_KEY = "my_secret_key"
-ALGORITHM = "HS256"
-
-# Banco de dados fictício para autenticação
-fake_db = {
-    "user1": "123",
-    "user2": "111",
-}
-
-# Inicializando a aplicação FastAPI
 app = FastAPI()
 
-# Função para gerar o token JWT
-def create_access_token(data: dict, expires_delta: timedelta):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + expires_delta
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+# Modelo de entrada para autenticação
+class TokenRequest(BaseModel):
+    access_token: str
+    secret_token: str
 
-# Rota para autenticação via GET
-@app.get("/login")
-async def login(username: str, password: str):
-    # Verificação do usuário e senha
-    if username in fake_db and fake_db[username] == password:
-        access_token_expires = timedelta(minutes=1)
-        access_token = create_access_token(
-            data={"sub": username},
-            expires_delta=access_token_expires
-        )
-        return {"access_token": access_token, "token_type": "bearer"}
-    else:
-        raise HTTPException(status_code=401, detail="Credenciais inválidas")
-
-# Exemplo de uma rota protegida que requer autenticação
-@app.get("/protected")
-async def protected_route(token: str):
+# Endpoint para tentar autenticar um acesso e gerar token
+@app.post("/api/authenticate")
+async def authenticate(request: TokenRequest):
+    # Validar usuário
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-        return {"message": f"Bem-vindo, {username}!"}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expirado")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Token inválido")
+        validate_user(request.access_token, request.secret_token)
+    except HTTPException as e:
+        raise HTTPException(status_code=401, detail="Acesso nao autorizado")
+
+    # Gerar token JWT
+    token = create_access_token(data={"sub": request.access_token})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")) * 60
+    }
+
+# Configuração para extrair o token do cabeçalho Authorization
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/authenticate")
+
+@app.get("/api/validate-token")
+async def validate_token(token: str = Depends(oauth2_scheme)):
+    """
+    Valida se o token enviado no cabeçalho Authorization ainda é válido.
+    """
+    try:
+        payload = decode_access_token(token)
+        return {"valid": True, "message": "Token is valid", "data": payload}
+    except HTTPException as e:
+        raise HTTPException(status_code=401, detail="erro ao validar token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Token invalido ou expirado")
