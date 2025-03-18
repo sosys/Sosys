@@ -8,7 +8,7 @@ def Get_API(headers, get_url, api_delete_url):
     try:
         external_codes = []
         current_url = get_url
-        page = '0'
+        page = '2000'
         
         # Loop para processar páginas enquanto 'next_page' não for null
         while page != 'null':
@@ -53,7 +53,7 @@ def Get_API(headers, get_url, api_delete_url):
     except Exception as e:
         print(f"Erro inesperado: {e}")
 
-get_url_order = "https://v3.isa-api.com/api/v2/order-header/?user=SOSYS&skip="
+#get_url_order = "https://v3.isa-api.com/api/v2/order-header/?user=SOSYS&skip="
 get_url_item = "https://v3.isa-api.com/api/v2/order-item/?skip="
 api_delete_url_order = "https://v3.isa-api.com/api/v2/order-header/"
 api_delete_url_item = "https://v3.isa-api.com/api/v2/order-item/"
