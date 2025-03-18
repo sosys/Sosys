@@ -4,8 +4,9 @@ import pyodbc
 import tkinter as tk
 from tkinter import simpledialog, filedialog, messagebox, ttk
 from dotenv import dotenv_values
+from dotenv import dotenv_values, set_key
 
-def get_db_connection(db_config):
+def get_db_connection(db_config, config_path):
     """Retorna uma conexão com o banco de dados baseado na configuração usando apenas pyodbc."""
     driver, server, database, user, password = db_config
     
@@ -15,6 +16,7 @@ def get_db_connection(db_config):
         return conn
     except pyodbc.Error as e:
         messagebox.showerror("Erro", f"Falha ao conectar no banco de dados: {e}")
+        set_key(config_path, "TESTE", "ERRO")  # Salva erro no arquivo .env
         return None
 
 def execute_test_queries():
@@ -48,7 +50,7 @@ def execute_test_queries():
         messagebox.showwarning("Aviso", f"O cliente {client_name} não existe. Certifique-se de criá-lo antes de executar as consultas.")
         return
     
-    conn = get_db_connection(db_config)
+    conn = get_db_connection(db_config, config_path)
     if not conn:
         return 
     try:
@@ -115,9 +117,11 @@ def execute_test_queries():
         progress_window.destroy()
         
         if files_processed:
+            set_key(config_path, "TESTE", "OK")  # Indica que o teste foi realizado com sucesso
             messagebox.showinfo("Sucesso", "Consultas executadas e arquivos gerados com sucesso.")
         else:
             messagebox.showwarning("Aviso", "Nenhum arquivo de consulta encontrado ou processado.")
     
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao executar as queries: {e}")
+        set_key(config_path, "TESTE", "ERRO")  # Indica erro na execução
