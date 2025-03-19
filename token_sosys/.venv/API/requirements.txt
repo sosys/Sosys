@@ -1,7 +1,0 @@
-fastapi[standard]==0.0.4
-uvicorn
-sqlalchemy
-psycopg2-binary
-python-dotenv
-pyjwt
-argon2-cffi
